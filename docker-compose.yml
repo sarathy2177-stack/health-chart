@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ben_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ben_user
+      POSTGRES_PASSWORD: ben_secure_password_123
+      POSTGRES_DB: ben_health
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ben_user -d ben_health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ben_webapp
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://ben_user:ben_secure_password_123@postgres:5432/ben_health"
+      BETTER_AUTH_URL: "http://localhost:3000" # Change to your LAN IP (e.g. http://10.200.190.20:3000) or domain
+      BETTER_AUTH_SECRET: "ben_production_secret_key_change_me_super_secure"
+      TRUSTED_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+
+volumes:
+  pgdata:
+    driver: local
